@@ -2,9 +2,9 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Owin;
 using RimDev.AspNet.Diagnostics.HealthChecks;
+using RimDev.AspNet.Diagnostics.HealthChecks.Configuration;
 using System.Threading;
 using System.Threading.Tasks;
-using RimDev.AspNet.Diagnostics.HealthChecks.UI;
 
 namespace MvcSample
 {
@@ -12,25 +12,45 @@ namespace MvcSample
     {
         public void Configuration(IAppBuilder app)
         {
-            app.UseHealthChecks(
-                "/_health",
-                new NoopHealthCheck(),
-                //new SlowNoopHealthCheck(),
-                //new SqlServerHealthCheck(
-                //    @"Data Source=(LocalDB)\v13.0;Integrated Security=True;Initial Catalog=master",
-                //    "select 'a'"),
-                new PingHealthCheck(new PingHealthCheckOptions().AddHost("localhost", 1000)));
+            LegacyHealthCheckRoutes
+                .MapHealthChecks("/health/plain")
+                .WithOptions(new HealthCheckOptions()) // Plain response writer
+                .WithOptions(options => options.AllowCachingResponses = false)
+                .AddCheck<FailingHealthCheck>()
+                .AddCheck<FailingHealthCheck>("Failing health check")
+                .AddCheck(new FailingHealthCheck())
+                .AddCheck(new FailingHealthCheck(), "Failing health check");
 
-            // Sample with named checks for Health Check UI project
-            app.UseHealthChecks(
-                "/_health_ui",
-                new HealthCheckOptions
+            LegacyHealthCheckRoutes
+                .MapHealthChecks("/health/plain-ui")
+                .AddCheck<FailingHealthCheck>()
+                .AddCheck<FailingHealthCheck>("Failing health check")
+                .AddCheck(new FailingHealthCheck())
+                .AddCheck(new FailingHealthCheck(), "Failing health check");
+
+            LegacyHealthCheckRoutes
+                .MapDefaultHealthChecks() // /health
+                .AddCheck<SlowNoopHealthCheck>()
+                .AddChecks(
+                    new NoopHealthCheck(),
+                    new FailingHealthCheck(),
+                    new PingHealthCheck(new PingHealthCheckOptions().AddHost("localhost", 1000))
+                )
+                .AddNamedChecks(() => new[]
                 {
-                    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-                },
-                new HealthCheckWrapper(new NoopHealthCheck(), "Noop health check"),
-                new HealthCheckWrapper(new FailingHealthCheck(), "Failing health check"),
-                new HealthCheckWrapper(new PingHealthCheck(new PingHealthCheckOptions().AddHost("localhost", 1000)), "Ping to localhost"));
+                    new NamedHealthCheck("Noop health check", new NoopHealthCheck()),
+                    new NamedHealthCheck("Failing health check", new FailingHealthCheck()),
+                    new NamedHealthCheck("Ping to localhost", new PingHealthCheck(new PingHealthCheckOptions().AddHost("localhost", 1000)))
+                });
+
+            LegacyHealthCheckRoutes
+                .MapHealthChecks("/health/noop")
+                .AddCheck<NoopHealthCheck>("Noop health check");
+
+            // Below example will throw due to reuse of route
+            // LegacyHealthCheckRoutes
+            //     .MapHealthChecks("health/noop") // Normalized to/health/noop - throws
+            //     .AddCheck<NoopHealthCheck>("Noop health check");
         }
     }
 

@@ -5,6 +5,7 @@
 
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
+using RimDev.AspNet.Diagnostics.HealthChecks.Configuration;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -27,7 +28,7 @@ namespace RimDev.AspNet.Diagnostics.HealthChecks
 
         public async Task<HealthReport> CheckHealthAsync(
             // Func<HealthCheckRegistration, bool> predicate,
-            IEnumerable<HealthCheckWrapper> healthChecks,
+            IEnumerable<NamedHealthCheck> healthChecks,
             CancellationToken cancellationToken = default(CancellationToken))
         {
             var entries = new Dictionary<string, HealthReportEntry>(StringComparer.OrdinalIgnoreCase);
@@ -120,17 +121,17 @@ namespace RimDev.AspNet.Diagnostics.HealthChecks
         // with modifications.
         private static class Log
         {
-            private static readonly Action<ILogger, Exception> _healthCheckProcessingBegin = LoggerMessage.Define(
+            private static readonly Action<ILogger, Exception?> _healthCheckProcessingBegin = LoggerMessage.Define(
                 LogLevel.Debug,
                 EventIds.HealthCheckProcessingBegin,
                 "Running health checks");
 
-            private static readonly Action<ILogger, double, HealthStatus, Exception> _healthCheckProcessingEnd = LoggerMessage.Define<double, HealthStatus>(
+            private static readonly Action<ILogger, double, HealthStatus, Exception?> _healthCheckProcessingEnd = LoggerMessage.Define<double, HealthStatus>(
                 LogLevel.Debug,
                 EventIds.HealthCheckProcessingEnd,
                 "Health check processing completed after {ElapsedMilliseconds}ms with combined status {HealthStatus}");
 
-            private static readonly Action<ILogger, string, Exception> _healthCheckBegin = LoggerMessage.Define<string>(
+            private static readonly Action<ILogger, string?, Exception?> _healthCheckBegin = LoggerMessage.Define<string?>(
                 LogLevel.Debug,
                 EventIds.HealthCheckBegin,
                 "Running health check {HealthCheckName}");
@@ -138,22 +139,22 @@ namespace RimDev.AspNet.Diagnostics.HealthChecks
             // These are separate so they can have different log levels
             private static readonly string HealthCheckEndText = "Health check {HealthCheckName} completed after {ElapsedMilliseconds}ms with status {HealthStatus} and '{HealthCheckDescription}'";
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string, Exception> _healthCheckEndHealthy = LoggerMessage.Define<string, double, HealthStatus, string>(
+            private static readonly Action<ILogger, string, double, HealthStatus, string?, Exception?> _healthCheckEndHealthy = LoggerMessage.Define<string, double, HealthStatus, string?>(
                 LogLevel.Debug,
                 EventIds.HealthCheckEnd,
                 HealthCheckEndText);
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string, Exception> _healthCheckEndDegraded = LoggerMessage.Define<string, double, HealthStatus, string>(
+            private static readonly Action<ILogger, string, double, HealthStatus, string?, Exception?> _healthCheckEndDegraded = LoggerMessage.Define<string, double, HealthStatus, string?>(
                 LogLevel.Warning,
                 EventIds.HealthCheckEnd,
                 HealthCheckEndText);
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string, Exception> _healthCheckEndUnhealthy = LoggerMessage.Define<string, double, HealthStatus, string>(
+            private static readonly Action<ILogger, string, double, HealthStatus, string?, Exception?> _healthCheckEndUnhealthy = LoggerMessage.Define<string, double, HealthStatus, string?>(
                 LogLevel.Error,
                 EventIds.HealthCheckEnd,
                 HealthCheckEndText);
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string, Exception> _healthCheckEndFailed = LoggerMessage.Define<string, double, HealthStatus, string>(
+            private static readonly Action<ILogger, string, double, HealthStatus, string?, Exception?> _healthCheckEndFailed = LoggerMessage.Define<string, double, HealthStatus, string?>(
                 LogLevel.Error,
                 EventIds.HealthCheckEnd,
                 HealthCheckEndText);
@@ -173,12 +174,12 @@ namespace RimDev.AspNet.Diagnostics.HealthChecks
                 _healthCheckProcessingEnd(logger, duration.TotalMilliseconds, status, null);
             }
 
-            public static void HealthCheckBegin(ILogger logger, HealthCheckWrapper healthCheck)
+            public static void HealthCheckBegin(ILogger logger, NamedHealthCheck healthCheck)
             {
                 _healthCheckBegin(logger, healthCheck.Name, null);
             }
 
-            public static void HealthCheckEnd(ILogger logger, HealthCheckWrapper healthCheck, HealthReportEntry entry, TimeSpan duration)
+            public static void HealthCheckEnd(ILogger logger, NamedHealthCheck healthCheck, HealthReportEntry entry, TimeSpan duration)
             {
                 switch (entry.Status)
                 {
@@ -196,12 +197,12 @@ namespace RimDev.AspNet.Diagnostics.HealthChecks
                 }
             }
 
-            public static void HealthCheckError(ILogger logger, HealthCheckWrapper healthCheck, Exception exception, TimeSpan duration)
+            public static void HealthCheckError(ILogger logger, NamedHealthCheck healthCheck, Exception exception, TimeSpan duration)
             {
                 _healthCheckError(logger, healthCheck.Name, duration.TotalMilliseconds, exception);
             }
 
-            public static void HealthCheckData(ILogger logger, HealthCheckWrapper healthCheck, HealthReportEntry entry)
+            public static void HealthCheckData(ILogger logger, NamedHealthCheck healthCheck, HealthReportEntry entry)
             {
                 if (entry.Data.Count > 0 && logger.IsEnabled(LogLevel.Debug))
                 {
@@ -221,7 +222,7 @@ namespace RimDev.AspNet.Diagnostics.HealthChecks
             private readonly string _name;
             private readonly List<KeyValuePair<string, object>> _values;
 
-            private string _formatted;
+            private string? _formatted;
 
             public HealthCheckDataLogValue(string name, IReadOnlyDictionary<string, object> values)
             {
